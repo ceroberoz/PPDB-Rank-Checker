@@ -37,12 +37,12 @@ if [ "$CURRENT_PERINGKAT" != "$LAST_PERINGKAT" ]; then
   echo "$CURRENT_PERINGKAT" > "$LAST_VALUE_FILE"
 
   # Send email using mail (install `mailutils` or `bsd-mailx`)
-  echo "Daniswara Raka Sanjaya - rank changed to $CURRENT_PERINGKAT"
+  # echo "Daniswara Raka Sanjaya - rank changed to $CURRENT_PERINGKAT of 87"
   #| mail -s "Rank Update Alert" perdanahadisanjaya@gmail.com
 
   BOT_TOKEN="7878381653:AAGcuJUp6zqas4dUxmDkHf_0kWRLHIm-54M"
   CHAT_ID="90355776"  # Replace with your own Telegram ID
-  MESSAGE="Daniswara Raka Sanjaya - rank changed to $CURRENT_PERINGKAT"
+  MESSAGE="Daniswara Raka Sanjaya - rank changed to $CURRENT_PERINGKAT of 87"
 
   curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
     -d chat_id="$CHAT_ID" \
