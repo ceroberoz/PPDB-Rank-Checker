@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # File to store the last seen value
-LAST_VALUE_FILE="/tmp/last_peringkat.txt"
+LAST_VALUE_FILE="./last_peringkat.txt"
 
 # Fetch the JSON (replace with your curl command)
 JSON=$(curl 'https://spmb.bogorkab.go.id/v2/ppdb-service/pendaftaran/pendaftaranDaftarPilihanSekolah' \
@@ -37,5 +37,14 @@ if [ "$CURRENT_PERINGKAT" != "$LAST_PERINGKAT" ]; then
   echo "$CURRENT_PERINGKAT" > "$LAST_VALUE_FILE"
 
   # Send email using mail (install `mailutils` or `bsd-mailx`)
-  # echo "Daniswara Raka Sanjaya - rank changed to $CURRENT_PERINGKAT" | mail -s "Rank Update Alert" perdanahadisanjaya@gmail.com
+  echo "Daniswara Raka Sanjaya - rank changed to $CURRENT_PERINGKAT"
+  #| mail -s "Rank Update Alert" perdanahadisanjaya@gmail.com
+
+  BOT_TOKEN="7878381653:AAGcuJUp6zqas4dUxmDkHf_0kWRLHIm-54M"
+  CHAT_ID="90355776"  # Replace with your own Telegram ID
+  MESSAGE="Daniswara Raka Sanjaya - rank changed to $CURRENT_PERINGKAT"
+
+  curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
+    -d chat_id="$CHAT_ID" \
+    -d text="$MESSAGE"
 fi
