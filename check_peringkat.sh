@@ -1,5 +1,19 @@
 #!/bin/bash
 
+# Script to check and notify about PPDB rank changes
+#
+# This script fetches the current rank from the PPDB system, compares it with the
+# previously stored rank, and sends a notification via Telegram if there's a change.
+#
+# Environment variables required in .env file:
+# - AUTH_TOKEN: Bearer token for API authentication
+# - PENGGUNA_ID: User ID for the student
+# - BOT_TOKEN: Telegram bot token
+# - CHAT_ID: Telegram chat ID to send notifications to
+#
+# Author: Perdana Hadi Sanjaya
+# Date: July 2025
+
 # Get the directory of the script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
@@ -14,11 +28,18 @@ else
   exit 1
 fi
 
-# Fetch the JSON (replace with your curl command)
-JSON=$(curl 'https://spmb.bogorkab.go.id/v2/ppdb-service/pendaftaran/pendaftaranDaftarPilihanSekolah' \
+# Check if required variables are set
+if [ -z "$AUTH_TOKEN" ] || [ -z "$PENGGUNA_ID" ] || [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
+  echo "Error: Missing required environment variables in $SCRIPT_DIR/.env!"
+  echo "Required variables: AUTH_TOKEN, PENGGUNA_ID, BOT_TOKEN, CHAT_ID"
+  exit 1
+fi
+
+# Fetch the JSON
+JSON=$(curl -s 'https://spmb.bogorkab.go.id/v2/ppdb-service/pendaftaran/pendaftaranDaftarPilihanSekolah' \
   -H 'Accept: application/json, text/plain, */*' \
   -H 'Accept-Language: en-US,en;q=0.9' \
-  -H 'Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpbnN0YW5zaV9wZXJhbl9wZW5nZ3VuYV9pZCI6IjQ3QjZDRENELTRFOUItNEJGNy1CNjdBLTU1NEU1MTA2NzRDQiIsInBlbmdndW5hX2lkIjoiRjRGMzQxMzYtMkI2Ny00MTZCLUIyMDAtRkI1MkExQjhBMTRBIiwidXNlcm5hbWUiOiJhODJhZjFlNDY2QHNwbWIuZ28uaWQiLCJuaWsiOiIzMjAxMTMxMzEyMTgwMDA0IiwibmlzbiI6IiAgICAgICAgICAiLCJuYW1hIjoiRGFuYW5qYXlhIFJla2EgU2FuamF5YSIsInRlbXBhdF9sYWhpciI6IkpBS0FSVEEiLCJ0YW5nZ2FsX2xhaGlyIjoiMjAxOC0xMi0xMyIsIm5hbWFfaWJ1X2thbmR1bmciOiJIRVJJTlRJQSBQVVNQQVJBTkkiLCJuaWtfaWJ1IjoiMzIwMTEzNzEwMTkwMDAwMyIsImplbmlzX2tlbGFtaW4iOiJMIiwibmFtYV9heWFoIjoiUEVSREFOQSBIQURJIFNBTkpBWUEiLCJuaWtfYXlhaCI6IjMyMDExMzE3MDc5MDAwMDYiLCJuYW1hX3dhbGkiOiIiLCJuaWtfd2FsaSI6IiAgICAgICAgICAgICAgICAiLCJhbGFtYXRfamFsYW4iOiJLUCBLRUxBUEEiLCJydCI6NSwicnciOjMsIm5hbWFfZHVzdW4iOiIiLCJrb2RlX3dpbGF5YWgiOiIwMjA1MjJBRyAgIiwia29kZV9wYWR1a3VoYW4iOm51bGwsInBhZHVrdWhhbiI6bnVsbCwia29kZV9kZXNhX2tlbHVyYWhhbiI6IjAyMDUyMkFHICAiLCJkZXNhX2tlbHVyYWhhbiI6IlJhd2EgUGFuamFuZyIsImtvZGVfa2VjYW1hdGFuIjoiMDIwNTIyICAgICIsImtlY2FtYXRhbiI6IktlYy4gQm9qb25nIEdlZGUiLCJrb2RlX2thYnVwYXRlbiI6IjAyMDUwMCAgICAiLCJrYWJ1cGF0ZW4iOiJLYWIuIEJvZ29yIiwia29kZV9wcm92aW5zaSI6IjAyMDAwMCAgICAiLCJwcm92aW5zaSI6IlByb3YuIEphd2EgQmFyYXQiLCJsaW50YW5nIjotNi40NTUwMTcsImJ1anVyIjoxMDYuNzc4NDM1LCJrZWJ1dHVoYW5fa2h1c3VzX2lkIjowLCJrZWJ1dHVoYW5fa2h1c3VzIjoiVGlkYWsgQWRhIiwiYWdhbWFfaWQiOjEsImFnYW1hIjoiSXNsYW0iLCJub21vcl9rb250YWsiOiIwODExMTE4MzExOSIsIm5vbW9yX3VqaWFuIjoiICAgICAgICAgICAgICAgICAgICAiLCJub21vcl9raXAiOiIiLCJub21vcl9wa2giOiIiLCJub21vcl9rayI6IjMyMDExMzMwMDgxODAwMTQiLCJ0YW5nZ2FsX2trIjoiMjAyMC0wMi0xMSIsImZsYWdfa2tfc2F0dV90YWh1biI6MCwiZmxhZ19kdGtzIjowLCJmbGFnX29yYW5nX3R1YV9ndXJ1IjowLCJpbnN0YW5zaV9pZF9vcmFuZ190dWEiOm51bGwsImluc3RhbnNpX29yYW5nX3R1YSI6bnVsbCwidmVyaWZpa2FzaV9iaW9kYXRhIjoxLCJ2ZXJpZmlrYXRvcl9iaW9kYXRhIjpudWxsLCJ0YW5nZ2FsX3ZlcmlmaWthc2lfYmlvZGF0YSI6bnVsbCwiamVuamFuZ19pZCI6MiwiamVuamFuZyI6IlNEIiwicGVuZ2d1bmFhbl9wZXRhIjoxLCJwZW5nZ3VuYWFuX3JhcG9ydCI6MCwicGVuZ2d1bmFhbl9iZXJrYXMiOjEsInBlbmdndW5hYW5fcHJlc3Rhc2kiOjAsImluc3RhbnNpX2lkIjoiM0I3NEVENTgtNEVEMS00NjQyLUE2QjgtNzQyNDRGQjkxNTkzIiwiaW5zdGFuc2kiOiIwMDAwMDAwMCAtIEJFTFVNIEJFUlNFS09MQUgiLCJrb2RlX2thYnVwYXRlbl9pbnN0YW5zaSI6IjAyMDUwMCIsInN0YXR1c19pbnN0YW5zaSI6IlMiLCJwZXJhbl9pZCI6MSwicGVyYW4iOiJTaXN3YS9PcmFuZ3R1YSIsInN0YXR1c19iaW9kYXRhIjoiVGVydmVyaWZpa2FzaSIsImplbmlzX3RpbmdnYWxfaWQiOjAsImplbmlzX3RpbmdnYWwiOiJUaWRhayBBZGEiLCJyZWdpc3RyYXNpIjoxLCJzaXN3YV91bmdnYWhfYmVya2FzIjoxLCJzaXN3YV9oYXB1c19iZXJrYXMiOjEsInNpc3dhX3RhbWJhaF9wcmVzdGFzaSI6MCwic2lzd2FfaGFwdXNfcHJlc3Rhc2kiOjAsInNpc3dhX3ViYWhfcHJlc3Rhc2kiOjAsInBlbmdndW5hYW5fYmVya2FzX3ByZXN0YXNpIjowLCJzaXN3YV90YW1iYWhfbmlsYWlfcmFwb3J0IjowLCJzaXN3YV9oYXB1c19uaWxhaV9yYXBvcnQiOjAsInVzaWEiOjIzOTIsInBlbmdndW5hYW5fYmF0YXNfd2lsYXlhaCI6MCwia2xhc2lmaWthc2lfa2tfaWQiOjAsImR0a3NfcGVtYWRhbmFuIjowLCJkdGtzX2tlbHVhcmdhX3BraCI6MCwiZHRrc19rZWx1YXJnYV9icG50IjowLCJkdGtzX2FuZ2dvdGFfcGJpIjowLCJkdGtzX2FrdGlmIjowLCJkdGtzX3BlcmlvZGVfc2siOm51bGwsImR1a2NhcGlsX3BlbWFkYW5hbiI6MSwiZHVrY2FwaWxfa2V0ZXJhbmdhbl9uaWsiOiJTZXN1YWkiLCJkdWtjYXBpbF9rZXRlcmFuZ2FuX25hbWEiOiJTZXN1YWkgKDEwMCkiLCJkdWtjYXBpbF9rZXRlcmFuZ2FuX3RlbXBhdF9sYWhpciI6IlNlc3VhaSAoMTAwKSIsImR1a2NhcGlsX2tldGVyYW5nYW5fdGFuZ2dhbF9sYWhpciI6IlNlc3VhaSIsImR1a2NhcGlsX2tldGVyYW5nYW5famVuaXNfa2VsYW1pbiI6IlNlc3VhaSIsImR1a2NhcGlsX2tldGVyYW5nYW5fbm9tb3Jfa2siOiJTZXN1YWkiLCJkdWtjYXBpbF9rZXRlcmFuZ2FuX2FsYW1hdF9qYWxhbiI6IlNlc3VhaSAoMTAwKSIsImR1a2NhcGlsX2tldGVyYW5nYW5fcnQiOiJTZXN1YWkiLCJkdWtjYXBpbF9rZXRlcmFuZ2FuX3J3IjoiU2VzdWFpIiwiZHVrY2FwaWxfa2V0ZXJhbmdhbl9kZXNhX2tlbHVyYWhhbiI6IlRpZGFrIFNlc3VhaSIsImR1a2NhcGlsX2tldGVyYW5nYW5fa2VjYW1hdGFuIjoiVGlkYWsgU2VzdWFpIiwiZHVrY2FwaWxfa2V0ZXJhbmdhbl9rYWJ1cGF0ZW5fa290YSI6IlNlc3VhaSIsImR1a2NhcGlsX2tldGVyYW5nYW5fcHJvdmluc2kiOiJTZXN1YWkiLCJkdWtjYXBpbF9rZXRlcmFuZ2FuX25pa19heWFoIjoiU2VzdWFpIiwiZHVrY2FwaWxfa2V0ZXJhbmdhbl9uaWtfaWJ1IjoiU2VzdWFpIiwiZHVrY2FwaWxfa2V0ZXJhbmdhbl9uaWtfd2FsaSI6bnVsbCwiZHVrY2FwaWxfa2V0ZXJhbmdhbl9uYW1hX2F5YWgiOiJTZXN1YWkgKDEwMCkiLCJkdWtjYXBpbF9rZXRlcmFuZ2FuX25hbWFfaWJ1IjoiU2VzdWFpICgxMDApIiwiZHVrY2FwaWxfa2V0ZXJhbmdhbl9uYW1hX3dhbGkiOm51bGwsImR1a2NhcGlsX2tldGVyYW5nYW5fbm9tb3Jfa2tfYXlhaCI6IlNlc3VhaSIsImR1a2NhcGlsX2tldGVyYW5nYW5fbm9tb3Jfa2tfaWJ1IjoiU2VzdWFpIiwiZHVrY2FwaWxfa2V0ZXJhbmdhbl9ub21vcl9ra193YWxpIjpudWxsLCJzdGF0dXNfcGVuZXJpbWFhbiI6MSwic3RhdHVzX2RhZnRhcl91bGFuZyI6MCwic2Vrb2xhaF90dWp1YW4iOiJTRCBORUdFUkkgU1VSQUtBUllBIDAyIiwic3VkYWhfdWJhaF9wYXNzd29yZCI6MSwiaWF0IjoxNzUxNjQyMjQ5LCJleHAiOjE3NTE3Mjg2NDksImlzcyI6InB0LWJ0dS5jby5pZCIsInN1YiI6ImRldmVsb3BtZW50LXRlYW1AcHQtYnR1LmNvLmlkIn0.Tbd4TKqaq6kpU5eIhIiMues0gHIlLwLfYG4C3FHxipx4GSUzrBZ4THQvtmaJVps0WQfuLt4SP0rhL-tFV_EMUV_YpVUMxHHnzN7O4NS_NcnUb6YgClOK1BCCr2MOR5m_0jJY1i0oVFscj1lkpyt_i4J6bUYRi1wUIMemW6T1tOI1V9_BWPOTzO-BF7DLC7GzlJZ-zvTvAs5CIW2jHMWdsCvekQRMO8lfmkjlyi8hB1x04q_Pam8Rw6eAM0AEL6I1C52rn8wOc_9Mwk56PmaPAEov3JHTjzL2_G_McQdISEZdM9uBsN3tRjr4wneFlx4n9kdzPXeCaUcQuVsSk7ui7A' \
+  -H "Authorization: Bearer ${AUTH_TOKEN}" \
   -H 'Connection: keep-alive' \
   -H 'Content-Type: application/json' \
   -H 'Origin: https://spmb.bogorkab.go.id' \
@@ -27,10 +48,19 @@ JSON=$(curl 'https://spmb.bogorkab.go.id/v2/ppdb-service/pendaftaran/pendaftaran
   -H 'Sec-Fetch-Mode: cors' \
   -H 'Sec-Fetch-Site: same-origin' \
   -H 'User-Agent: Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 CrKey/1.54.250320' \
-  --data-raw '{"pengguna_id":"F4F34136-2B67-416B-B200-FB52A1B8A14A"}')
+  --data-raw "{\"pengguna_id\":\"${PENGGUNA_ID}\"}")
+
+# Check if the API request was successful
+if [ "$(echo "$JSON" | jq -r '.status_code')" != "200" ]; then
+  echo "Error: API request failed with response: $JSON"
+  exit 1
+fi
 
 # Extract peringkat
 CURRENT_PERINGKAT=$(echo "$JSON" | jq -r '.data[0].peringkat')
+
+# Extract kuota
+CURRENT_KUOTA=$(echo "$JSON" | jq -r '.data[0].kuota')
 
 # Read last value (if file doesn't exist, assume empty)
 if [ -f "$LAST_VALUE_FILE" ]; then
@@ -39,19 +69,30 @@ else
   LAST_PERINGKAT=""
 fi
 
+# Check if peringkat was successfully extracted
+if [ -z "$CURRENT_PERINGKAT" ] || [ "$CURRENT_PERINGKAT" = "null" ]; then
+  echo "Error: Could not extract peringkat from API response"
+  exit 1
+fi
+
 # Compare current vs last
 if [ "$CURRENT_PERINGKAT" != "$LAST_PERINGKAT" ]; then
   # Save new value
   echo "$CURRENT_PERINGKAT" > "$LAST_VALUE_FILE"
 
-  # Send email using mail (install `mailutils` or `bsd-mailx`)
-  # echo "Daniswara Raka Sanjaya - rank changed to $CURRENT_PERINGKAT of 87"
-  #| mail -s "Rank Update Alert" perdanahadisanjaya@gmail.com
+  # Log the change
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - Rank changed from ${LAST_PERINGKAT:-N/A} to $CURRENT_PERINGKAT of $CURRENT_KUOTA" >> "$SCRIPT_DIR/rank_change_log.txt"
 
-  # BOT_TOKEN and CHAT_ID are loaded from .env file
-  MESSAGE="Dananjaya Reka Sanjaya - rank changed to $CURRENT_PERINGKAT of 87"
+  # Create notification message
+  MESSAGE="$NAMA_ANAK - rank changed to $CURRENT_PERINGKAT of $CURRENT_KUOTA"
 
-  curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
-    -d chat_id="$CHAT_ID" \
-    -d text="$MESSAGE"
+  # Send Telegram notification
+  TELEGRAM_RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+    -d "chat_id=${CHAT_ID}" \
+    -d "text=${MESSAGE}")
+
+  # Check if Telegram notification was sent successfully
+  if [[ "$TELEGRAM_RESPONSE" != *"\"ok\":true"* ]]; then
+    echo "Warning: Failed to send Telegram notification: $TELEGRAM_RESPONSE"
+  fi
 fi

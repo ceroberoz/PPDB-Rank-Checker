@@ -1,2 +1,18 @@
+# Environment variables and secrets
 .env
+.env.*
+!.env.example
+
+# Runtime data
 last_peringkat.txt
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
