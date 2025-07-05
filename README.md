@@ -90,13 +90,13 @@ These values must be obtained from the PPDB Bogor Regency system:
 
 ![Developer tool](img/developer_tool.png)
 
-3. Find the API request containing your authentication token and user ID
+3. Find the API request containing your authentication token and user ID. Check for URL or keyword `pendaftaranDaftarPilihanSekolah` in XHR request
 
-Check for URL or keyword `pendaftaranDaftarPilihanSekolah` in XHR request
-
-4. Copy the request as curl
+4. Copy the request as curl from the PPDB system
 
 ![Inspect Network Requests](img/inspect_element_login.png)
+
+Sample generated curl from the PPDB system, copy and save the authentication token (AUTH_TOKEN) and user ID (PENGGUNA_ID) to `.env` file
 
 ![Generated CURL](img/generated_curl.png)
 
