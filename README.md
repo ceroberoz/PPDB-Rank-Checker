@@ -4,7 +4,7 @@ This tool periodically checks a student's current rank in the PPDB system and se
 
 ### Example Notification
 
-![Telegram Bot Notification](telegram_bot_notification.png)
+![Telegram Bot Notification](img/telegram_bot_notification.png)
 
 ## Limitation
 
@@ -33,7 +33,7 @@ This tool periodically checks a student's current rank in the PPDB system and se
    cd ppdb-rank-checker
    ```
 
-2. Create a `.env` file with the following variables:
+2. Create (or copy from `.env.example`) a `.env` file with the following variables:
    ```
    NAMA_ANAK="Student Name"
    BOT_TOKEN="your_telegram_bot_token"
@@ -87,7 +87,18 @@ To automatically check for rank changes, set up a cron job to run the script at 
 These values must be obtained from the PPDB Bogor Regency system:
 1. Log in to the PPDB system
 2. Use browser developer tools to inspect network requests
+
+![Developer tool](img/developer_tool.png)
+
 3. Find the API request containing your authentication token and user ID
+
+Check for URL or keyword `pendaftaranDaftarPilihanSekolah` in XHR request
+
+4. Copy the request as curl
+
+![Inspect Network Requests](img/inspect_element_login.png)
+
+![Generated CURL](img/generated_curl.png)
 
 ## License
 
