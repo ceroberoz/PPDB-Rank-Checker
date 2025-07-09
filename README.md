@@ -56,15 +56,19 @@ This tool periodically checks a student's current rank in the PPDB system and se
 
 To automatically check for rank changes, set up a cron job to run the script at regular intervals.
 
-1. Open your crontab file:
-   ```bash
-   crontab -e
-   ```
+1.  Open your crontab file:
+    ```bash
+    crontab -e
+    ```
 
-2. Add a line to run the script every hour (or adjust as needed):
-   ```
-   0 * * * * /path/to/ppdb-rank-checker/check_peringkat.sh
-   ```
+2.  Add a line to run the script every hour (or adjust as needed):
+    ```
+    0 * * * * /path/to/ppdb-rank-checker/check_peringkat.sh
+    ```
+
+## Logging
+
+The script logs all its actions (fetching, success, failures, rank changes) to `activity.log` in the script's directory. This is useful for debugging, especially when the script is run automatically by a cron job.
 
 ## Security Note
 
