@@ -25,13 +25,13 @@ set -o pipefail
 # --- Constants and Setup ---
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 LAST_VALUE_FILE="$SCRIPT_DIR/last_peringkat.txt"
-LOG_FILE="$SCRIPT_DIR/rank_change_log.txt"
+ACTIVITY_LOG_FILE="$SCRIPT_DIR/activity.log"
 
 # --- Functions ---
 
-# Log messages to stdout with a timestamp.
+# Log messages to a file and stdout.
 log() {
-  echo "$(date '+%Y-%m-%d %H:%M:%S') - $*"
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - $*" | tee -a "$ACTIVITY_LOG_FILE"
 }
 
 # Load environment variables from .env file.
@@ -46,18 +46,18 @@ load_env() {
     exit 1
   fi
 
-  # Check if required variables are set
-  if [ -z "${AUTH_TOKEN:-}" ] || [ -z "${PENGGUNA_ID:-}" ] || [ -z "${BOT_TOKEN:-}" ] || [ -z "${CHAT_ID:-}" ]; then
-    log "Error: Missing required environment variables in $SCRIPT_DIR/.env!"
-    log "Required variables: AUTH_TOKEN, PENGGUNA_ID, BOT_TOKEN, CHAT_ID"
+  # Check for required variables
+  if [ -z "${AUTH_TOKEN-}" ] || [ -z "${PENGGUNA_ID-}" ] || [ -z "${BOT_TOKEN-}" ] || [ -z "${CHAT_ID-}" ]; then
+    log "Error: Missing required environment variables in .env!"
+    log "Required: AUTH_TOKEN, PENGGUNA_ID, BOT_TOKEN, CHAT_ID"
     exit 1
   fi
 }
 
-# Fetch rank data from the PPDB API.
+# Fetch rank data from the API.
 fetch_rank_data() {
-  local response
-  response=$(curl -s 'https://spmb.bogorkab.go.id/v2/ppdb-service/pendaftaran/pendaftaranDaftarPilihanSekolah' \
+  # -w "\n%{http_code}" appends the HTTP status code to the output on a new line
+  curl -s -w "\n%{http_code}" 'https://spmb.bogorkab.go.id/v2/ppdb-service/pendaftaran/pendaftaranDaftarPilihanSekolah' \
     -H 'Accept: application/json, text/plain, */*' \
     -H 'Accept-Language: en-US,en;q=0.9' \
     -H "Authorization: Bearer ${AUTH_TOKEN}" \
@@ -69,24 +69,7 @@ fetch_rank_data() {
     -H 'Sec-Fetch-Mode: cors' \
     -H 'Sec-Fetch-Site: same-origin' \
     -H 'User-Agent: Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 CrKey/1.54.250320' \
-    --data-raw "{\"pengguna_id\":\"${PENGGUNA_ID}\"}")
-
-  if [ -z "$response" ]; then
-    log "Error: API request failed. Received empty response from server."
-    exit 1
-  fi
-
-  # Check if the API request was successful
-  if [ "$(echo "$response" | jq -r '.status_code')" != "200" ]; then
-    log "Error: API request failed with response: $response"
-    # Check for common token expiration error
-    if echo "$response" | jq -e '.message == "Token is Expired"' > /dev/null; then
-        log "Hint: The AUTH_TOKEN may have expired. Please update it in the .env file."
-    fi
-    exit 1
-  fi
-
-  echo "$response"
+    --data-raw "{\"pengguna_id\":\"${PENGGUNA_ID}\"}"
 }
 
 # Send a notification message via Telegram.
@@ -112,47 +95,63 @@ main() {
   load_env
 
   log "Fetching current rank..."
-  local json_data
-  json_data=$(fetch_rank_data)
+  local full_response
+  full_response=$(fetch_rank_data)
 
-  # Extract peringkat and kuota
-  local current_peringkat
-  current_peringkat=$(echo "$json_data" | jq -r '.data[0].peringkat')
-  local current_kuota
-  current_kuota=$(echo "$json_data" | jq -r '.data[0].kuota')
+  # Extract status code and response body
+  local http_status
+  http_status=$(echo "$full_response" | tail -n1)
+  local json_response
+  json_response=$(echo "$full_response" | sed '$d')
 
-  # Check if peringkat was successfully extracted
-  if [ -z "$current_peringkat" ] || [ "$current_peringkat" = "null" ]; then
-    log "Error: Could not extract 'peringkat' from API response. Response: $json_data"
+  # Validate API response
+  if [ "$http_status" = "401" ]; then
+    log "Error: API request failed with HTTP status 401. The AUTH_TOKEN has likely expired."
+    send_telegram_notification "Error: PPDB rank check failed. The AUTH_TOKEN has expired. Please update it."
+    exit 1
+  elif [ "$http_status" != "200" ]; then
+    log "Error: API request failed with HTTP status $http_status. Response: $json_response"
+    send_telegram_notification "Error: PPDB rank check API request failed with status $http_status."
     exit 1
   fi
 
-  # Read last value (if file doesn't exist, assume empty)
-  local last_peringkat
-  last_peringkat=$(cat "$LAST_VALUE_FILE" 2>/dev/null || echo "")
+  # Extract data
+  local current_peringkat
+  current_peringkat=$(echo "$json_response" | jq -r '.data[0].peringkat')
+  local current_kuota
+  current_kuota=$(echo "$json_response" | jq -r '.data[0].kuota')
 
-  log "Current rank: $current_peringkat of $current_kuota. Last seen rank: ${last_peringkat:-N/A}."
+  # Validate extracted data
+  if [ -z "$current_peringkat" ] || [ "$current_peringkat" = "null" ] || [ -z "$current_kuota" ] || [ "$current_kuota" = "null" ]; then
+    log "Error: Could not extract rank or quota from API response. The API structure may have changed. Response: $json_response"
+    send_telegram_notification "Error: Could not parse rank/quota from API response."
+    exit 1
+  fi
 
-  # Compare current vs last
+  log "Successfully fetched rank: $current_peringkat of $current_kuota"
+
+  # Read last known rank
+  local last_peringkat=""
+  if [ -f "$LAST_VALUE_FILE" ]; then
+    last_peringkat=$(cat "$LAST_VALUE_FILE")
+  fi
+
+  # Compare and notify if changed
   if [ "$current_peringkat" != "$last_peringkat" ]; then
-    log "Rank changed from ${last_peringkat:-N/A} to $current_peringkat of $current_kuota. Notifying..."
+    log "Rank changed from ${last_peringkat:-N/A} to $current_peringkat of $current_kuota"
 
     # Save new value
     echo "$current_peringkat" > "$LAST_VALUE_FILE"
 
-    # Log the change to the dedicated log file
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - Rank changed from ${last_peringkat:-N/A} to $current_peringkat of $current_kuota" >> "$LOG_FILE"
-
     # Create notification message
     local message
-    message="${NAMA_ANAK:-Student} - rank changed to $current_peringkat of $current_kuota"
+    message="${NAMA_ANAK:-Student} - Rank changed to $current_peringkat of $current_kuota"
 
-    # Send Telegram notification
     send_telegram_notification "$message"
   else
-    log "No rank change detected."
+    log "Rank remains unchanged at $current_peringkat of $current_kuota. No notification sent."
   fi
 }
 
-# Run the main function
-main
+# --- Script Execution ---
+main "$@"

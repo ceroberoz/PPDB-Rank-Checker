@@ -1,3 +1,7 @@
+# PPDB Rank Checker
+
+A simple automated system to monitor and notify about changes in PPDB (Penerimaan Peserta Didik Baru - Student Admission) ranking for the Bogor Regency school admission system.
+
 ## Overview
 
 This tool periodically checks a student's current rank in the PPDB system and sends a notification via Telegram when the rank changes. It's particularly useful during the school admission period when rankings can change frequently due to other students joining or leaving the admission process.
@@ -6,10 +10,6 @@ This tool periodically checks a student's current rank in the PPDB system and se
 
 ![Telegram Bot Notification](img/telegram_bot_notification.png)
 
-## Limitation
-
-- Due to AUTH_TOKEN expiration time, the tool may not function correctly after the token expires (~ 24 hours). Therefore, it is recommended to regularly update the AUTH_TOKEN to ensure the tool's functionality.
-
 ## Features
 
 - Automatically fetches the latest ranking from the PPDB Bogor Regency system
@@ -17,6 +17,10 @@ This tool periodically checks a student's current rank in the PPDB system and se
 - Sends notifications via Telegram when changes are detected
 - Stores the latest rank for future comparison
 - Includes the total number of available slots in notifications
+
+## Limitation
+
+- Due to AUTH_TOKEN expiration time, the tool may not function correctly after the token expires (~ 24 hours). Therefore, it is recommended to regularly update the AUTH_TOKEN to ensure the tool's functionality.
 
 ## Requirements
 
@@ -56,15 +60,19 @@ This tool periodically checks a student's current rank in the PPDB system and se
 
 To automatically check for rank changes, set up a cron job to run the script at regular intervals.
 
-1. Open your crontab file:
-   ```bash
-   crontab -e
-   ```
+1.  Open your crontab file:
+    ```bash
+    crontab -e
+    ```
 
-2. Add a line to run the script every hour (or adjust as needed):
-   ```
-   0 * * * * /path/to/ppdb-rank-checker/check_peringkat.sh
-   ```
+2.  Add a line to run the script every hour (or adjust as needed):
+    ```
+    0 * * * * /path/to/ppdb-rank-checker/check_peringkat.sh
+    ```
+
+## Logging
+
+The script logs all its actions (fetching, success, failures, rank changes) to `activity.log` in the script's directory. This is useful for debugging, especially when the script is run automatically by a cron job.
 
 ## Security Note
 

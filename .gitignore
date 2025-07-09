@@ -6,6 +6,7 @@
 # Runtime data
 last_peringkat.txt
 rank_change_log.txt
+activity.log
 
 # OS specific files
 .DS_Store
