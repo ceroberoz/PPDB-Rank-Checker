@@ -53,7 +53,8 @@ load_env() {
 
 # Fetch rank data from the API.
 fetch_rank_data() {
-  curl -s 'https://spmb.bogorkab.go.id/v2/ppdb-service/pendaftaran/pendaftaranDaftarPilihanSekolah' \
+  # -w "\n%{http_code}" appends the HTTP status code to the output on a new line
+  curl -s -w "\n%{http_code}" 'https://spmb.bogorkab.go.id/v2/ppdb-service/pendaftaran/pendaftaranDaftarPilihanSekolah' \
     -H 'Accept: application/json, text/plain, */*' \
     -H 'Accept-Language: en-US,en;q=0.9' \
     -H "Authorization: Bearer ${AUTH_TOKEN}" \
@@ -86,19 +87,26 @@ send_telegram_notification() {
 # --- Main Logic ---
 
 main() {
-  # Ensure data and log files exist
-  touch "$LAST_VALUE_FILE" "$ACTIVITY_LOG_FILE" 2>/dev/null
-
   load_env
 
   log "Fetching current rank..."
+  local full_response
+  full_response=$(fetch_rank_data)
+
+  # Extract status code and response body
+  local http_status
+  http_status=$(echo "$full_response" | tail -n1)
   local json_response
-  json_response=$(fetch_rank_data)
+  json_response=$(echo "$full_response" | sed '$d')
 
   # Validate API response
-  if ! echo "$json_response" | jq -e '.status_code == 200' > /dev/null; then
-    log "Error: API request failed. Response: $json_response"
-    send_telegram_notification "Error: PPDB rank check API request failed."
+  if [ "$http_status" = "401" ]; then
+    log "Error: API request failed with HTTP status 401. The AUTH_TOKEN has likely expired."
+    send_telegram_notification "Error: PPDB rank check failed. The AUTH_TOKEN has expired. Please update it."
+    exit 1
+  elif [ "$http_status" != "200" ]; then
+    log "Error: API request failed with HTTP status $http_status. Response: $json_response"
+    send_telegram_notification "Error: PPDB rank check API request failed with status $http_status."
     exit 1
   fi
 
@@ -109,9 +117,9 @@ main() {
   current_kuota=$(echo "$json_response" | jq -r '.data[0].kuota')
 
   # Validate extracted data
-  if [ -z "$current_peringkat" ] || [ "$current_peringkat" = "null" ]; then
-    log "Error: Could not extract rank from API response. It might be expired token"
-    send_telegram_notification "Error: Could not extract rank. The auth token may have expired."
+  if [ -z "$current_peringkat" ] || [ "$current_peringkat" = "null" ] || [ -z "$current_kuota" ] || [ "$current_kuota" = "null" ]; then
+    log "Error: Could not extract rank or quota from API response. The API structure may have changed. Response: $json_response"
+    send_telegram_notification "Error: Could not parse rank/quota from API response."
     exit 1
   fi
 
@@ -129,8 +137,6 @@ main() {
 
     # Save new value
     echo "$current_peringkat" > "$LAST_VALUE_FILE"
-
-    # The change is already recorded by the main log function.
 
     # Create notification message
     local message
